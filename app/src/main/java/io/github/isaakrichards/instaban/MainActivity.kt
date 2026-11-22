@@ -77,6 +77,7 @@ class MainActivity : Activity() {
             setMargins(0, 0, dp(16), dp(88))
         })
         setContentView(root)
+        Rules.keepClearOfSystemBars(root)
 
         Rules.configure(web)
         web.addJavascriptInterface(Bridge(), "InstaBan")

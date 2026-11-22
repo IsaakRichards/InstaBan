@@ -5,6 +5,9 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.view.View
+import android.view.WindowInsets
 import android.webkit.CookieManager
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -78,6 +81,32 @@ object Rules {
     /** Links sent in chats go through l.instagram.com; returns the real target. */
     fun unwrapLinkShim(uri: Uri): Uri? =
         if (uri.host == "l.instagram.com") uri.getQueryParameter("u")?.let(Uri::parse) else null
+
+    /**
+     * Android 15+ draws apps edge-to-edge, under the status bar and camera
+     * cutout. Pad the window so Instagram's page sits inside the safe area,
+     * and above the keyboard while typing (edge-to-edge breaks adjustResize).
+     */
+    fun keepClearOfSystemBars(root: View) {
+        root.setOnApplyWindowInsetsListener { v, insets ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val i = insets.getInsets(
+                    WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.ime()
+                )
+                v.setPadding(i.left, i.top, i.right, i.bottom)
+                WindowInsets.CONSUMED
+            } else {
+                @Suppress("DEPRECATION")
+                v.setPadding(
+                    insets.systemWindowInsetLeft, insets.systemWindowInsetTop,
+                    insets.systemWindowInsetRight, insets.systemWindowInsetBottom
+                )
+                @Suppress("DEPRECATION")
+                insets.consumeSystemWindowInsets()
+            }
+        }
+        root.requestApplyInsets()
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     fun configure(web: WebView) {

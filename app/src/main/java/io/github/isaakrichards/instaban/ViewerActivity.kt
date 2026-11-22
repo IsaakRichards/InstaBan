@@ -57,6 +57,7 @@ class ViewerActivity : Activity() {
         root.addView(web, FrameLayout.LayoutParams(MATCH, MATCH))
         root.addView(progress, FrameLayout.LayoutParams(MATCH, (3 * resources.displayMetrics.density).toInt(), Gravity.TOP))
         setContentView(root)
+        Rules.keepClearOfSystemBars(root)
 
         Rules.configure(web)
         web.addJavascriptInterface(Bridge(), "InstaBan")
