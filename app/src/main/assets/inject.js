@@ -18,15 +18,12 @@
     'a[href="/explore/"]',
     'a[href="/reels/"]',
     'a[href*="/create/"]',
-    'a[href="/accounts/activity/"]',
-    'a[href="/notifications/"]',
     'svg[aria-label="Home"]',
     'svg[aria-label="Search"]',
     'svg[aria-label="Explore"]',
     'svg[aria-label="Reels"]',
     'svg[aria-label="New post"]',
     'svg[aria-label="Create"]',
-    'svg[aria-label="Notifications"]',
     'svg[aria-label="Threads"]',
     // "Open in app" / "Get the app" nags
     'a[href*="play.google.com"]',
@@ -43,7 +40,7 @@
   // clickable ancestor of those SVGs too, but only in navigation bars so
   // we never touch message bubbles.
   var NAV_LABELS = ['Home', 'Search', 'Explore', 'Reels', 'New post',
-                    'Create', 'Notifications', 'Threads'];
+                    'Create', 'Threads'];
 
   function sweep() {
     NAV_LABELS.forEach(function (label) {
@@ -57,7 +54,7 @@
     // The profile tab: a nav link wrapping your own avatar.
     document.querySelectorAll('nav a, [role="navigation"] a, [role="tablist"] a').forEach(function (a) {
       var href = a.getAttribute('href') || '';
-      if (!href.startsWith('/direct') && !href.startsWith('/accounts')) {
+      if (!href.startsWith('/direct') && !href.startsWith('/accounts') && !href.startsWith('/notifications')) {
         a.style.setProperty('display', 'none', 'important');
       }
     });
@@ -79,11 +76,12 @@
   var bridge = window.InstaBan;
   var SHARED_PATH = /^\/(?:[^\/]+\/)?(p|reel|reels|tv)\/[A-Za-z0-9_-]+|^\/stories\/[^\/]+\/[^\/]+/;
 
-  // 1) In a chat, tapping a shared item opens it in InstaBan's locked
+  // 1) In a chat or on the notifications page, tapping a post/reel/story opens it in InstaBan's locked
   //    single-item viewer instead of Instagram's swipeable one.
   if (MODE === 'main') {
     document.addEventListener('click', function (e) {
-      if (!location.pathname.startsWith('/direct')) return;
+      var here = location.pathname;
+      if (!here.startsWith('/direct') && !here.startsWith('/accounts/activity') && !here.startsWith('/notifications')) return;
       var a = e.target && e.target.closest && e.target.closest('a[href]');
       if (!a) return;
       var u;

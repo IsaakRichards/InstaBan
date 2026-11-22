@@ -12,6 +12,7 @@ import android.webkit.WebView
 /** Where InstaBan is and isn't allowed to go. */
 object Rules {
     const val INBOX = "https://www.instagram.com/direct/inbox/"
+    const val ACTIVITY = "https://www.instagram.com/accounts/activity/"
 
     private val IG_HOSTS = setOf("instagram.com", "www.instagram.com", "m.instagram.com")
 
@@ -25,6 +26,7 @@ object Rules {
     // The Instagram paths the main window may be on.
     private val ALLOWED_PREFIXES = listOf(
         "/direct",
+        "/accounts/activity", "/notifications",
         "/accounts/login", "/accounts/onetap", "/accounts/emailsignup",
         "/accounts/password", "/accounts/logout", "/accounts/suspended",
         "/accounts/two_factor", "/accounts/consent",

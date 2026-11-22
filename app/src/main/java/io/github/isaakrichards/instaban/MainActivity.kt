@@ -7,6 +7,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -25,6 +26,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -48,6 +50,7 @@ class MainActivity : Activity() {
     private lateinit var web: WebView
     private lateinit var progress: ProgressBar
     private lateinit var errorView: View
+    private lateinit var activityButton: ImageButton
 
     private var injectJs: String = ""
     private var fileCallback: ValueCallback<Array<Uri>>? = null
@@ -69,6 +72,10 @@ class MainActivity : Activity() {
         root.addView(web, FrameLayout.LayoutParams(MATCH, MATCH))
         root.addView(progress, FrameLayout.LayoutParams(MATCH, dp(3), Gravity.TOP))
         root.addView(errorView, FrameLayout.LayoutParams(MATCH, MATCH))
+        activityButton = buildActivityButton()
+        root.addView(activityButton, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.BOTTOM or Gravity.END).apply {
+            setMargins(0, 0, dp(16), dp(88))
+        })
         setContentView(root)
 
         Rules.configure(web)
@@ -154,6 +161,7 @@ class MainActivity : Activity() {
         override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
             super.doUpdateVisitedHistory(view, url, isReload)
             val uri = Uri.parse(url ?: return)
+            updateActivityButton(uri)
             if (!Rules.isInstagram(uri) || Rules.isAllowedInstagram(uri)) return
 
             // The bare root is the home feed: Instagram lands there after login,
@@ -182,6 +190,7 @@ class MainActivity : Activity() {
         override fun onPageFinished(view: WebView, url: String?) {
             view.evaluateJavascript(injectJs, null)
             progress.visibility = View.GONE
+            url?.let { updateActivityButton(Uri.parse(it)) }
             CookieManager.getInstance().flush()
         }
 
@@ -206,6 +215,27 @@ class MainActivity : Activity() {
                 Toast.makeText(this@MainActivity, R.string.doom_blocked, Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    // ---------- notifications button ----------
+
+    /** Instagram keeps its heart button on the (banned) home feed, so the inbox gets its own. */
+    private fun buildActivityButton() = ImageButton(this).apply {
+        setImageResource(R.drawable.ic_activity)
+        contentDescription = getString(R.string.notifications)
+        background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(0xCC2B2140.toInt())
+        }
+        elevation = dp(4).toFloat()
+        visibility = View.GONE
+        setOnClickListener { web.loadUrl(Rules.ACTIVITY) }
+    }
+
+    private fun updateActivityButton(uri: Uri) {
+        val path = uri.path ?: ""
+        activityButton.visibility =
+            if (Rules.isInstagram(uri) && path.startsWith("/direct/inbox")) View.VISIBLE else View.GONE
     }
 
     private var lastToast = 0L
