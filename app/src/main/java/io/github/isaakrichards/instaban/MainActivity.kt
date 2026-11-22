@@ -1,7 +1,6 @@
 package io.github.isaakrichards.instaban
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.DownloadManager
 import android.content.ActivityNotFoundException
@@ -21,7 +20,7 @@ import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
-import android.webkit.WebSettings
+import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
@@ -41,28 +40,9 @@ import android.widget.Toast
 class MainActivity : Activity() {
 
     companion object {
-        private const val INBOX = "https://www.instagram.com/direct/inbox/"
+        private const val INBOX = Rules.INBOX
         private const val REQ_FILE = 1001
         private const val REQ_PERMS = 1002
-
-        private val IG_HOSTS = setOf("instagram.com", "www.instagram.com", "m.instagram.com")
-
-        // Hosts needed for login, 2FA, and account checks.
-        private val AUTH_HOSTS = setOf(
-            "accountscenter.instagram.com",
-            "www.facebook.com", "m.facebook.com", "facebook.com",
-            "auth.meta.com", "accounts.meta.com"
-        )
-
-        // The only Instagram paths you're allowed to be on.
-        private val ALLOWED_PREFIXES = listOf(
-            "/direct",
-            "/accounts/login", "/accounts/onetap", "/accounts/emailsignup",
-            "/accounts/password", "/accounts/logout", "/accounts/suspended",
-            "/accounts/two_factor", "/accounts/consent",
-            "/challenge", "/two_factor", "/auth_platform",
-            "/consent", "/session", "/oauth", "/legal", "/privacy"
-        )
     }
 
     private lateinit var web: WebView
@@ -73,10 +53,10 @@ class MainActivity : Activity() {
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var pendingPermission: PermissionRequest? = null
 
-    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        injectJs = assets.open("inject.js").bufferedReader().use { it.readText() }
+        injectJs = "window.__instabanMode='main';" +
+            assets.open("inject.js").bufferedReader().use { it.readText() }
 
         val root = FrameLayout(this)
         web = WebView(this)
@@ -91,28 +71,8 @@ class MainActivity : Activity() {
         root.addView(errorView, FrameLayout.LayoutParams(MATCH, MATCH))
         setContentView(root)
 
-        CookieManager.getInstance().apply {
-            setAcceptCookie(true)
-            setAcceptThirdPartyCookies(web, true)
-        }
-
-        web.settings.apply {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            databaseEnabled = true
-            mediaPlaybackRequiresUserGesture = false
-            loadWithOverviewMode = true
-            useWideViewPort = true
-            setSupportZoom(false)
-            builtInZoomControls = false
-            cacheMode = WebSettings.LOAD_DEFAULT
-            // Strip the WebView markers so Instagram treats us like mobile Chrome
-            // instead of pushing the "get the app" wall.
-            userAgentString = userAgentString
-                .replace("; wv)", ")")
-                .replace(Regex("Version/\\d+\\.\\d+ "), "")
-        }
-
+        Rules.configure(web)
+        web.addJavascriptInterface(Bridge(), "InstaBan")
         web.webViewClient = Gatekeeper()
         web.webChromeClient = Chrome()
         web.setDownloadListener { url, ua, disposition, mime, _ -> download(url, ua, disposition, mime) }
@@ -131,23 +91,22 @@ class MainActivity : Activity() {
 
     private fun startUrl(intent: Intent?): String {
         val data = intent?.data ?: return INBOX
-        return if (isAllowedInstagram(data)) data.toString() else INBOX
+        return if (Rules.isAllowedInstagram(data)) data.toString() else INBOX
     }
 
     // ---------- the wall ----------
 
-    private fun isAllowedInstagram(uri: Uri): Boolean {
-        val host = uri.host?.lowercase() ?: return false
-        if (host !in IG_HOSTS) return false
-        val path = uri.path ?: "/"
-        return ALLOWED_PREFIXES.any { path.startsWith(it) }
-    }
+    private var lastViewerUrl: String? = null
+    private var lastViewerAt = 0L
 
-    private fun isAuthHost(uri: Uri): Boolean = uri.host?.lowercase() in AUTH_HOSTS
-
-    private fun isInstagram(uri: Uri): Boolean {
-        val host = uri.host?.lowercase() ?: return false
-        return host in IG_HOSTS || host.endsWith(".instagram.com")
+    /** A friend sent a reel/post/story: show just that one, in the locked viewer. */
+    private fun openViewer(uri: Uri) {
+        val url = uri.toString()
+        val now = System.currentTimeMillis()
+        if (Rules.sharedKey(uri) == lastViewerUrl?.let { Rules.sharedKey(Uri.parse(it)) } && now - lastViewerAt < 1500) return
+        lastViewerUrl = url
+        lastViewerAt = now
+        startActivity(Intent(this, ViewerActivity::class.java).putExtra(ViewerActivity.EXTRA_URL, url))
     }
 
     private inner class Gatekeeper : WebViewClient() {
@@ -163,15 +122,18 @@ class MainActivity : Activity() {
 
             // Links people send you in chats go through l.instagram.com; open the
             // real destination in your normal browser.
-            if (uri.host == "l.instagram.com") {
-                uri.getQueryParameter("u")?.let { openExternal(Uri.parse(it)) }
+            Rules.unwrapLinkShim(uri)?.let { Rules.openExternal(this@MainActivity, it); return true }
+            if (uri.host == "l.instagram.com") return true
+
+            if (Rules.isAllowedInstagram(uri) || Rules.isAuthHost(uri)) return false
+
+            if (Rules.sharedKey(uri) != null) {
+                openViewer(uri)
                 return true
             }
 
-            if (isAllowedInstagram(uri) || isAuthHost(uri)) return false
-
-            if (isInstagram(uri)) {
-                // Home, explore, reels, stories, profiles, posts: no.
+            if (Rules.isInstagram(uri)) {
+                // Home, explore, reels feed, profiles: no.
                 // The root path right after login is the usual case; send it to the inbox.
                 if ((uri.path ?: "/") == "/") {
                     view.loadUrl(INBOX)
@@ -182,7 +144,7 @@ class MainActivity : Activity() {
             }
 
             // Anything else on the web: system browser.
-            openExternal(uri)
+            Rules.openExternal(this@MainActivity, uri)
             return true
         }
 
@@ -192,7 +154,7 @@ class MainActivity : Activity() {
         override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
             super.doUpdateVisitedHistory(view, url, isReload)
             val uri = Uri.parse(url ?: return)
-            if (!isInstagram(uri) || isAllowedInstagram(uri)) return
+            if (!Rules.isInstagram(uri) || Rules.isAllowedInstagram(uri)) return
 
             // The bare root is the home feed: Instagram lands there after login,
             // so go straight to the inbox instead of back into the login page.
@@ -200,7 +162,9 @@ class MainActivity : Activity() {
                 view.loadUrl(INBOX)
                 return
             }
-            blocked()
+            // A shared reel opened inside the chat: move it to the locked viewer
+            // and put the chat back the way it was.
+            if (Rules.sharedKey(uri) != null) openViewer(uri) else blocked()
             if (view.canGoBack()) {
                 view.goBack()
                 // If going back still lands outside (e.g. first page was the feed),
@@ -226,19 +190,30 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Called from inject.js. */
+    private inner class Bridge {
+        @JavascriptInterface
+        fun openShared(url: String) = runOnUiThread {
+            val uri = Uri.parse(url)
+            if (Rules.sharedKey(uri) != null) openViewer(uri)
+        }
+
+        @JavascriptInterface
+        fun doom() = runOnUiThread {
+            val now = System.currentTimeMillis()
+            if (now - lastToast > 2000) {
+                lastToast = now
+                Toast.makeText(this@MainActivity, R.string.doom_blocked, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     private var lastToast = 0L
     private fun blocked() {
         val now = System.currentTimeMillis()
         if (now - lastToast > 2000) {
             lastToast = now
             Toast.makeText(this, R.string.blocked, Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun openExternal(uri: Uri) {
-        try {
-            startActivity(Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE))
-        } catch (_: ActivityNotFoundException) {
         }
     }
 

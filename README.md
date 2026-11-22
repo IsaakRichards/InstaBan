@@ -8,6 +8,8 @@ InstaBan is a thin shell around Instagram's own website (`instagram.com/direct/i
 
 - **The wall (`MainActivity.kt`)**: every navigation is checked. Only `/direct/...` and the login / 2FA / security-check pages are allowed. Tapping into the feed, reels, explore, a profile or a post gets bounced back with a "Only messages live here" toast. This also catches Instagram's in-page (pushState) navigation.
 - **The curtain (`assets/inject.js`)**: hides the Home / Search / Reels / Create / Profile buttons and the "get the app" nags so you don't see the doors at all.
+- **Things friends send you still work, but only one at a time.** Tap a shared reel, post or story and it opens alone in a locked viewer. Swiping to the next reel, "more reels", profiles, or a story auto-advancing to someone else's get bounced. Press back to return to the chat right where you were.
+- If a reel opens inside the chat itself, a guard lets that one video play and pauses any other that starts (that's you swiping on), then closes the viewer if you keep trying.
 - Links people send you in chats open in your normal browser.
 - Photo sending, voice notes, downloads, and dark mode (follows the system) all work.
 
@@ -22,5 +24,4 @@ Locally: `gradle assembleRelease` with Gradle 8.14 and the Android SDK (API 35).
 ## Limits
 
 - **No push notifications.** A web wrapper can't get Instagram's push. Open the app to check messages.
-- Shared posts/reels inside chats can't be opened (that would be the feed sneaking back in).
 - Instagram changes its web markup often. If a feed button reappears, add a selector to the `HIDE` list in `inject.js`. The URL wall still stops it from working in the meantime.

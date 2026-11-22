@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">InstaBan</string>
     <string name="blocked">Only messages live here</string>
+    <string name="doom_blocked">Just the one your friend sent. No scrolling on.</string>
     <string name="offline">Can\'t reach Instagram. Check your connection.</string>
     <string name="retry">Retry</string>
 </resources>

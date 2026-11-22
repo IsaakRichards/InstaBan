@@ -40,5 +40,9 @@
                 <data android:pathPrefix="/direct" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".ViewerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|smallestScreenSize|uiMode" />
     </application>
 </manifest>
