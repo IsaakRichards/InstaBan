@@ -42,7 +42,81 @@
   var NAV_LABELS = ['Home', 'Search', 'Explore', 'Reels', 'New post',
                     'Create', 'Threads'];
 
+
+  // ---------------------------------------------------------------------
+  // No likes, comments or reposts on reels and posts.
+  // Applies everywhere in the single-item viewer, and inside reel/post
+  // overlays in the main window (never to chat messages themselves).
+  // ---------------------------------------------------------------------
+  var ENGAGE_LABELS = ['Like', 'Unlike', 'Comment', 'Comments', 'Repost', 'Reposted',
+                       'Undo repost', 'Remove repost'];
+  var ENGAGE_SVGS = ENGAGE_LABELS.map(function (l) { return 'svg[aria-label="' + l + '"]'; }).join(',');
+  var ENGAGE_OTHER = [
+    'a[href$="/liked_by/"]',                 // "Liked by ..." / like counts
+    'a[href*="/comments/"]',                 // "View all N comments"
+    'textarea[aria-label^="Add a comment"]', // comment box
+    'form:has(textarea[aria-label^="Add a comment"])',
+    'textarea[placeholder^="Add a comment"]'
+  ].join(',');
+
+  function inEngageScope(el) {
+    if ((window.__instabanMode || 'main') === 'viewer') return true;
+    return !!el.closest('[role="dialog"]');
+  }
+
+  function hide(el) { el.style.setProperty('display', 'none', 'important'); }
+
+  function stripEngagement() {
+    document.querySelectorAll(ENGAGE_SVGS).forEach(function (svg) {
+      if (!inEngageScope(svg)) return;
+      var btn = svg.closest('button, [role="button"], a');
+      // Only hide a small control, never a big container that happens to be clickable.
+      if (btn && btn.offsetWidth < 120 && btn.offsetHeight < 120) {
+        // Reels show the count right under the icon, in the same wrapper.
+        var wrap = btn.parentElement;
+        if (wrap && wrap.offsetWidth < 120 && wrap.offsetHeight < 140 && wrap.children.length <= 2) hide(wrap);
+        else hide(btn);
+      } else {
+        svg.style.setProperty('pointer-events', 'none', 'important');
+        hide(svg);
+      }
+    });
+    try {
+      document.querySelectorAll(ENGAGE_OTHER).forEach(function (el) {
+        if (inEngageScope(el)) hide(el);
+      });
+    } catch (_) { /* :has() unsupported on very old WebViews */ }
+  }
+
+  // Double-tap on a photo or video is a sneaky "like": swallow the second tap.
+  var lastMediaTap = 0;
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t || !t.closest || !inEngageScope(t)) return;
+    if (!t.closest('video, img, [role="presentation"]') && !(t.querySelector && t.querySelector('video, img'))) return;
+    var now = Date.now();
+    if (now - lastMediaTap < 350) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      lastMediaTap = 0;
+      return;
+    }
+    lastMediaTap = now;
+  }, true);
+  ['dblclick', 'touchend'].forEach(function (type) {
+    var lastTouch = 0;
+    document.addEventListener(type, function (e) {
+      var t = e.target;
+      if (!t || !t.closest || !inEngageScope(t) || !t.closest('video, img, [role="presentation"]')) return;
+      if (type === 'dblclick') { e.preventDefault(); e.stopImmediatePropagation(); return; }
+      var now = Date.now();
+      if (now - lastTouch < 350) { e.stopImmediatePropagation(); lastTouch = 0; return; }
+      lastTouch = now;
+    }, true);
+  });
+
   function sweep() {
+    stripEngagement();
     NAV_LABELS.forEach(function (label) {
       document.querySelectorAll('svg[aria-label="' + label + '"]').forEach(function (svg) {
         var clickable = svg.closest('a, [role="button"], [role="link"]');

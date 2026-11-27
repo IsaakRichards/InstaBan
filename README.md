@@ -10,6 +10,7 @@ InstaBan is a thin shell around Instagram's own website (`instagram.com/direct/i
 - **The curtain (`assets/inject.js`)**: hides the Home / Search / Reels / Create / Profile buttons and the "get the app" nags so you don't see the doors at all.
 - **Notifications are allowed.** Tap the heart button on the inbox to see likes, comments, follows and mentions. Tapping one opens that single post in the locked viewer; profiles stay off-limits.
 - **Things friends send you still work, but only one at a time.** Tap a shared reel, post or story and it opens alone in a locked viewer. Swiping to the next reel, "more reels", profiles, or a story auto-advancing to someone else's get bounced. Press back to return to the chat right where you were.
+- **Watch only, no engagement.** In the viewer (and in-chat reel overlays) the like, comment and repost buttons, like counts, and comment box are hidden, double-tap-to-like is swallowed, and the comments/likes pages are blocked.
 - If a reel opens inside the chat itself, a guard lets that one video play and pauses any other that starts (that's you swiping on), then closes the viewer if you keep trying.
 - Links people send you in chats open in your normal browser.
 - Photo sending, voice notes, downloads, and dark mode (follows the system) all work.

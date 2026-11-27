@@ -34,7 +34,6 @@ class ViewerActivity : Activity() {
     private lateinit var progress: ProgressBar
     private lateinit var lockedUrl: String
     private lateinit var lockedKey: String
-    private lateinit var lockedPath: String
     private var injectJs = ""
     private var lastToast = 0L
 
@@ -47,7 +46,6 @@ class ViewerActivity : Activity() {
         }
         lockedUrl = uri.toString()
         lockedKey = key
-        lockedPath = uri.path ?: "/"
         injectJs = "window.__instabanMode='viewer';" +
             assets.open("inject.js").bufferedReader().use { it.readText() }
 
@@ -74,8 +72,7 @@ class ViewerActivity : Activity() {
 
     private fun isAllowedHere(uri: Uri): Boolean {
         if (Rules.sharedKey(uri) == lockedKey) return true
-        // Sub-pages of the same item: comments, likes.
-        if (Rules.isInstagram(uri) && (uri.path ?: "").startsWith(lockedPath.trimEnd('/') + "/")) return true
+        // Comments and "liked by" sub-pages are deliberately not allowed.
         // Login / security checks, in case the session needs refreshing.
         return Rules.isAllowedInstagram(uri) && !(uri.path ?: "").startsWith("/direct") || Rules.isAuthHost(uri)
     }
